@@ -1,0 +1,4 @@
+openai:
+  api:
+    key: SECRET_OPEN_AI_KEY
+  model: gpt-4

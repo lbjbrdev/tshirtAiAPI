@@ -22,7 +22,7 @@ public class ShirtService {
         return shirtRepository.findById(id);
     }
 
-    public Shirt addShirt(Shirt shirt) {
+    public Shirt addShirt(Shirt shirt, MultipartFile imageFile) throws IOException {
         Optional<Shirt> existingShirt = shirtRepository.findByBrandAndModelAndYear(
             shirt.getBrand(),
             shirt.getModel(),
@@ -33,6 +33,32 @@ public class ShirtService {
             throw new RuntimeException("Shirt already exists in the collection!");
         }
 
-        return shirtRepository.save(shirt);
+        Shirt savedShirt = shirtRepository.save(shirt);
+
+        kafkaProducer.sendShirtEvent("New shirt added: " + savedShirt.getBrand() + " - " + savedShirt.getModel());
+
+        String description = String.format("%s %s %s %s %s", 
+            shirt.getBrand(), 
+            shirt.getModel(), 
+            shirt.getYear(), 
+            shirt.getSize(), 
+            shirt.getColor()
+        );
+
+        boolean isDuplicate = OpenAIService.isShirtDuplicate(description);
+
+        if (isDuplicate) {
+            throw new RuntimeException("This shirt is already in the collection!");
+        }
+
+        String imageUrl = s3Service.uploadFile(imageFile);
+
+        shirt.setImageUrl(imageUrl);
+
+        Shirt savedShirt = shirtRepository.save(shirt);
+
+        kafkaProducer.sendShirtEvent("New shirt added: " + savedShirt.getBrand() + " - " + savedShirt.getModel());
+
+        return savedShirt;
     }
 }
